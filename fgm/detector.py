@@ -29,40 +29,53 @@ def _similar_edges(pattern):
     return [pattern[k] + pattern[k + 1] for k in range(len(pattern) - 1)]
 
 
-def _binarize_rows(gray: np.ndarray, ys: np.ndarray) -> np.ndarray:
-    """走査線 ys を、行ごとに周りの明るさで2値化する（黒が True。逆光で全体が暗くても読めるように）。"""
-    w = gray.shape[1]
-    rows = cv2.GaussianBlur(gray[ys], (5, 1), 0).astype(np.float32)   # 横だけぼかしてノイズを減らす
+def _binarize_rows(frame: np.ndarray, line_step: int) -> np.ndarray:
+    """line_step 画素おきの走査線を、行ごとに周りの明るさで2値化する（黒が True。逆光で全体が暗くても読めるように）。
+    グレーにするのは走査線だけ。平均は uint8（四捨五入した整数）のまま比べる。"""
+    rows = frame[line_step // 2::line_step]
+    if rows.ndim == 3:
+        rows = cv2.cvtColor(rows, cv2.COLOR_BGR2GRAY)
+    rows = cv2.GaussianBlur(rows, (5, 1), 0)      # 横だけぼかしてノイズを減らす
+    w = rows.shape[1]
     mean = cv2.blur(rows, (max(31, (w // 4) | 1), 1), borderType=cv2.BORDER_REPLICATE)
-    return rows < mean - 5
+    return rows < cv2.subtract(mean, 5)           # mean < 5 のときは 0（黒にならない）
 
 
-def _find_pattern(black: np.ndarray, min_width: float, pattern) -> list:
-    """黒から始まる黒白の並びが pattern の比に合う区間を (走査線番号, 左端x, 右端x) で返す。
-    外側には白（余白）があること。numpy でまとめて処理する。"""
-    n = len(pattern)
-    w = black.shape[1]
-    rr, cc = np.nonzero(black[:, 1:] != black[:, :-1])
-    cc = cc + 1                              # 色が変わった最初の画素
+def _find_patterns(black: np.ndarray, min_width: float, patterns) -> list:
+    """黒から始まる黒白の並びが patterns のそれぞれの比に合う区間を、並びごとに
+    [(走査線番号, 左端x, 右端x), ...] で返す。外側には白（余白）があること。
+    色の境目は1回だけ求め、軽い条件で候補を絞ってから比を調べる。比は整数で比べる。"""
+    n = len(patterns[0])
+    h, w = black.shape
+    flat = black.ravel()
+    k = np.flatnonzero(flat[1:] != flat[:-1]) + 1   # 色が変わった最初の画素（平らにした位置）
+    keep = k % w != 0                                # 行の頭は前の行の終わりと比べているので除く
+    rr, cc = k[keep] // w, k[keep] % w
     if len(cc) < n + 1:
-        return []
+        return [[] for _ in patterns]
     m = len(cc) - n
-    e = [cc[j:j + m] for j in range(n + 1)]  # 境目 e0〜en
-    ok = (rr[:m] == rr[n:]) & black[rr[:m], e[0]]   # 同じ走査線で、黒から始まる
-    # 1マスの大きさ。e0→e(n-1) は「黒の始まり→黒の始まり」なのでにじみに強い
-    u = (e[n - 1] - e[0]) / float(sum(pattern[:n - 1]))
-    ok &= (e[n] - e[0]) >= min_width
-    for j, d in enumerate(_similar_edges(pattern)):
-        ok &= np.abs((e[j + 2] - e[j]) - d * u) <= FGM_TOL * u
-    # 外側の白（余白）が1マスくらいはあること。行の端は余白ありとみなす
-    idx = np.arange(m)
-    pi = np.maximum(idx - 1, 0)
-    prev = np.where((idx > 0) & (rr[pi] == rr[:m]), cc[pi], 0)
-    ni = np.minimum(idx + n + 1, len(cc) - 1)
-    nxt = np.where((idx + n + 1 < len(cc)) & (rr[ni] == rr[:m]), cc[ni], w)
-    ok &= (e[0] - prev >= FGM_TOL * u) & (nxt - e[n] >= FGM_TOL * u)
-    sel = np.nonzero(ok)[0]
-    return [(int(rr[i]), int(e[0][i]), int(e[n][i])) for i in sel]
+    # 同じ走査線で、幅が足りて、黒から始まるもの
+    i = np.flatnonzero((rr[:m] == rr[n:]) & (cc[n:] - cc[:m] >= min_width))
+    i = i[black[rr[i], cc[i]]]
+    e = [cc[i + j] for j in range(n + 1)]            # 境目 e0〜en
+    # 外側の白（余白）の幅。行の端は余白ありとみなす
+    pi = np.maximum(i - 1, 0)
+    prev = e[0] - np.where((i > 0) & (rr[pi] == rr[i]), cc[pi], 0)
+    ni = np.minimum(i + n + 1, len(cc) - 1)
+    nxt = np.where((i + n + 1 < len(cc)) & (rr[ni] == rr[i]), cc[ni], w) - e[n]
+    out = []
+    for pattern in patterns:
+        # 1マス u = d / s。e0→e(n-1) は「黒の始まり→黒の始まり」なのでにじみに強い。
+        # 「x と a·u の差が FGM_TOL·u 以内」を両辺 s 倍して |s·x − a·d| ≤ FGM_TOL·d で比べる（割り算の誤差を出さない）
+        s = sum(pattern[:n - 1])
+        d = e[n - 1] - e[0]
+        tol = FGM_TOL * d
+        ok = (s * prev >= tol) & (s * nxt >= tol)
+        for j, a in enumerate(_similar_edges(pattern)):
+            ok &= np.abs(s * (e[j + 2] - e[j]) - a * d) <= tol
+        sel = i[ok]
+        out.append(list(zip(rr[sel].tolist(), cc[sel].tolist(), cc[sel + n].tolist())))
+    return out
 
 
 class FgmDetector:
@@ -86,13 +99,11 @@ class FgmDetector:
         self.seen = False
 
     def detect(self, frame: np.ndarray) -> Detection:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
-        h, w = gray.shape
+        h = frame.shape[0]
         ys = np.arange(self.line_step // 2, h, self.line_step)
-        black = _binarize_rows(gray, ys)
-        min_width = h * self.min_size_pct / 100.0
-        found = {"L": self._chains(_find_pattern(black, min_width, FGM_LEFT), ys),
-                 "R": self._chains(_find_pattern(black, min_width, FGM_RIGHT), ys)}
+        black = _binarize_rows(frame, self.line_step)
+        left, right = _find_patterns(black, h * self.min_size_pct / 100.0, (FGM_LEFT, FGM_RIGHT))
+        found = {"L": self._chains(left, ys), "R": self._chains(right, ys)}
         corners, ids = [], []
         for name, chains in found.items():
             for c in chains:

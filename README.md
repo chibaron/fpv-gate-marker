@@ -1,71 +1,86 @@
-# FpvGateMarker（FGM）
+<div align="right"><a href="./README_jp.md">日本語はこちら</a></div>
 
-FPV ドローンのゲートに貼る縦縞のマーカーと、機体のカメラの映像からそれを読む検出器（Python / OpenCV）。
+# FpvGateMarker (FGM)
 
-- ゲートの左右の柱に1枚ずつ貼る。円形ゲートには、輪に沿って1周貼る。
-- 横線を間引いて読むだけなので軽い（640×480 で約2.5ms。ArUco の約半分）。
-- アナログ映像のボケ・ノイズ・インターレースのずれに強い。
+A striped marker for FPV drone race gates, and a detector (Python / OpenCV) that finds it in the onboard camera feed.
 
-仕様（マーカーの寸法・検出の手順・性能）は [docs/spec.md](docs/spec.md)。
+## Features
+
+- One marker on each side post of a gate. For round gates, a ring of stripes goes all the way around.
+- Easy to make: it is just black and white vertical stripes. No printer needed — black tape on a white board works.
+- Lightweight: it only reads a few sparse horizontal lines (about 0.5–2 ms at 640×480, a fraction of ArUco).
+- Robust to blur, noise and interlace combing in analog video.
+
+The full specification (marker dimensions, detection steps, performance) is in [docs/spec.md](docs/spec.md) (Japanese).
 
 ![FGM](docs/fgm.png)
 
-## マーカー
+## Markers
 
-| | 横方向の並び（左から、マス） |
+| | Horizontal pattern (left to right, in modules) |
 | --- | --- |
-| 左の柱 | 白1以上 : 黒3 : 白1 : 黒1 : 白1 : 黒1 : 白1以上 |
-| 右の柱 | 白1以上 : 黒1 : 白1 : 黒1 : 白1 : 黒3 : 白1以上 |
-| 円形ゲートの輪（外→内） | 白1 : 黒3 : 白1 : 黒1 : 白1 : 黒1 : 白1 |
+| Left post | white ≥1 : black 3 : white 1 : black 1 : white 1 : black 1 : white ≥1 |
+| Right post | white ≥1 : black 1 : white 1 : black 1 : white 1 : black 3 : white ≥1 |
+| Round gate ring (outside → inside) | white 1 : black 3 : white 1 : black 1 : white 1 : black 1 : white 1 |
 
-太い黒がゲートの外側に来るように、縞を縦にして貼ります。縦に長いほど読みやすく、機体が傾いても読めます。
+Mount the stripes vertically, with the thick black band on the outer side of the gate.
+Taller markers are easier to read and still work when the drone is tilted.
 
-印刷用の画像を作る:
+### Making one with tape
+
+Stick black vinyl tape vertically on a white board or sheet of paper. If one tape width is one module, the left post is
+3 tapes of black, a 1-tape gap, 1 tape, a gap, 1 tape (the right post is the mirror image).
+The detector reads ratios, so small errors are fine. Leave at least one module of white on the outer sides.
+
+### Printing
 
 ```
-pip install ".[opencv,pdf]"            # このフォルダで
-fgm-make-markers                       # markers/ に出力
-fgm-make-markers --gate-inner 700      # 内径700mm の円形ゲート用
+pip install ".[opencv,pdf]"            # in this folder
+fgm-make-markers                       # writes to markers/
+fgm-make-markers --gate-inner 700      # for a round gate with a 700 mm inner diameter
 ```
 
-- `marker_fgm_left.png` / `marker_fgm_right.png`: 左右の柱用。
-- `marker_fgm_ring.pdf`: 円形ゲート用（既定は内径600mm、A4 10枚）。**100%（実際のサイズ）で印刷**し、扇形に切って1周貼ります。
-  外側と内側の白も切り落とさないでください。
+- `marker_fgm_left.png` / `marker_fgm_right.png`: for the left and right posts.
+- `marker_fgm_ring.pdf`: for a round gate (default inner diameter 600 mm, 10 A4 pages). **Print at 100% (actual size)**,
+  cut out the arc segments and stick them all the way around. Do not trim the white on the inner and outer edges.
 
-## 検出
+## Detection
 
 ```python
 from fgm import FgmDetector
 
-det = FgmDetector()                 # 映像（カメラ）ごとに1つ作る
-d = det.detect(frame)               # BGR かグレーの画像
-d.visible                           # ゲートが見えているか
-d.corners, d.ids                    # 見つかった FGM ごとの四隅と "L" / "R"（枠の表示用）
+det = FgmDetector()                 # one per video stream (camera)
+d = det.detect(frame)               # BGR or grayscale image
+d.visible                           # is the gate visible
+d.corners, d.ids                    # corners of each FGM found, and "L" / "R" (for drawing)
 ```
 
-`visible` は、左右の両方が見えたら True になり、その後は左右の両方とも見えなくなるまで True のままです
-（ゲートに近づいて片方が先に画面から出ても False にならない）。ラップを計るときは、`visible` が True → False になった時を通過にします
-（一瞬読めなかったのを通過にしないよう、100ms ほど待つとよい）。
+`visible` turns True when both the left and right markers are seen, and stays True until both are gone
+(it does not turn False when one side leaves the frame first as you approach the gate). For lap timing, count a pass when
+`visible` goes from True to False (waiting about 100 ms helps ignore single missed frames).
 
-| 引数 | 既定 | 意味 |
+| Argument | Default | Meaning |
 | --- | --- | --- |
-| `line_step` | 4 | 何画素おきの横線を読むか |
-| `min_lines` | 3 | この本数の横線で続けて見つかったら1枚とする |
-| `min_size_pct` | 5.0 | FGM の幅の最小（フレーム高さに対する %）。遠くのゲートを読まない |
+| `line_step` | 4 | Read every Nth pixel row |
+| `min_lines` | 3 | Number of consecutive rows needed to accept a marker |
+| `min_size_pct` | 5.0 | Minimum marker width (black part) as % of frame height. Ignores distant gates |
 
-OpenCV は依存に入れていません（`opencv-python` と `opencv-contrib-python` を両方入れると壊れるので）。
-入っていなければ `[opencv]` を付けて入れてください。
+For small images such as 640×480, OpenCV runs faster with a single thread (`cv2.setNumThreads(1)`).
+This is a process-wide setting, so the detector does not change it.
 
-## 開発
+OpenCV is not a required dependency (installing both `opencv-python` and `opencv-contrib-python` breaks things).
+If you do not have it, install with the `[opencv]` extra.
+
+## Development
 
 ```
 pip install -e ".[opencv,pdf]"
-python tests/test_fgm.py                    # 合成映像でのテスト
-python tools/bench.py --videos a.mp4        # ArUco との比較（処理時間・認識率・誤検出）
+python tests/test_fgm.py                    # tests on synthetic video
+python tools/bench.py --videos a.mp4        # comparison with ArUco (speed, detection rate, false positives)
 ```
 
-使っているアプリ: d-plactice-ArUco（FPV ドローンのラップタイマー）
+Used by: d-plactice-ArUco (an FPV drone lap timer)
 
-## ライセンス
+## License
 
 MIT

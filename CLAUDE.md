@@ -28,4 +28,4 @@ fgm-make-markers                            # 印刷用（python -m fgm.markers 
 - 左 = 黒3:白1:黒1:白1:黒1、右はその鏡像、外側に白1以上。円形ゲートの輪は外から 白1:黒3:白1:黒1:白1:黒1:白1
 - 「見えた」= 左右の両方が見えた。「見えない」= 左右の両方とも見えない（その間は前のフレームのまま）
 - OpenCV は依存に入れない（`[opencv]` の extra。opencv-python と opencv-contrib-python がぶつかるため）
-- コメント・文書は日本語
+- コメント・文書は日本語。ただし `README.md` は英語（日本語版は `README_jp.md`。変えたら両方合わせる）
