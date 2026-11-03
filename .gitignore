@@ -1,6 +1,9 @@
 # fgm-make-markers の出力
 markers/
 
+# Claude Code 用の手元のメモ
+CLAUDE.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
