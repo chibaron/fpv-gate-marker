@@ -76,6 +76,24 @@ python tests/test_fgm.py                    # tests on synthetic video
 python tools/bench.py --videos a.mp4        # comparison with ArUco (speed, detection rate, false positives)
 ```
 
+### Lap timer for testing
+
+Runs a camera (or video file) through the detector and times laps. A pass is counted when the gate goes from visible
+to not visible for 100 ms; the pass time is the last frame the gate was visible. Each pass beeps (`--no-beep` to turn it off).
+
+```
+python tools/laptimer.py                    # find cameras, choose one if several; preview window (q quit, r reset laps)
+python tools/laptimer.py --camera 1         # camera 1, e.g. an analog video capture device
+python tools/laptimer.py --list-cameras     # list the cameras found
+python tools/laptimer.py --camera a.mp4 --headless --log laps.csv   # a recording, laps to CSV
+```
+
+Passes within 2 s of the previous one are ignored (`--min-lap`; lower it for fast tracks).
+The window shows the detected markers (L / R), whether the gate is visible, the current lap, detection time and
+the last 10 laps (best in yellow). Press q / Esc to quit and print a summary, r to reset laps.
+When several cameras are found, a window shows live video from each; press its number to choose.
+Frames are resized to 640×480 before detection (`--size none` keeps the original). See `--help` for the other options.
+
 ## License
 
 MIT

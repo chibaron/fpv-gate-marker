@@ -114,6 +114,26 @@ def test_gate_ring():
     assert n >= 3 and len(pages) == n and max(pages[0].shape) == int(297 * 50 / 25.4)
 
 
+def test_lap_timer():
+    """tools/laptimer.py: a pass is the last visible time, confirmed after flicker_ms; short gaps are not passes.
+
+    tools/laptimer.py: 通過は最後に見えた時刻で、flicker_ms 見えなければ決まる。短い途切れは通過にしない。"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
+    from laptimer import LapTimer
+
+    timer = LapTimer(flicker_ms=100, min_lap_s=2.0)
+    seq = [(0.0, True), (0.5, True), (0.55, False), (0.6, True),     # 50 ms gap is not a pass / 50ms の途切れは通過でない
+           (1.0, True), (1.05, False), (1.2, False),                 # pass at 1.0 / 1.0 に通過
+           (2.0, True), (2.1, False), (2.3, False),                  # 1.0 s after the previous: ignored / 前から1秒: 数えない
+           (6.0, True), (6.2, False),                                # pass at 6.0, lap 5.0 / 6.0 に通過、ラップ 5.0
+           (11.5, True), (11.7, False)]                           # pass at 11.5, lap 5.5 / 11.5 に通過、ラップ 5.5
+    passes = [tp for t, v in seq if (tp := timer.update(t, v)) is not None]
+    assert passes == [1.0, 6.0, 11.5] and timer.laps == [5.0, 5.5]
+    assert timer.running(13.0) == 1.5
+    timer.reset()
+    assert timer.passes == [] and timer.running(1.0) is None
+
+
 def test_write_markers():
     with tempfile.TemporaryDirectory() as d:
         paths = write_markers(d, module_px=4, dpi=50)
