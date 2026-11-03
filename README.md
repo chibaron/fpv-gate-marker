@@ -37,12 +37,9 @@ The detector reads ratios, so small errors are fine. Leave at least one module o
 ```
 pip install ".[opencv,pdf]"            # in this folder
 fgm-make-markers                       # writes to markers/
-fgm-make-markers --gate-inner 700      # for a round gate with a 700 mm inner diameter
 ```
 
 - `marker_fgm_left.png` / `marker_fgm_right.png`: for the left and right posts.
-- `marker_fgm_ring.pdf`: for a round gate (default inner diameter 600 mm, 10 A4 pages). **Print at 100% (actual size)**,
-  cut out the arc segments and stick them all the way around. Do not trim the white on the inner and outer edges.
 
 ## Detection
 

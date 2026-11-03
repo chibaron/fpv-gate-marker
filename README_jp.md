@@ -32,12 +32,9 @@ FPV ドローンのゲートに貼る縦縞のマーカーと、機体のカメ�
 ```
 pip install ".[opencv,pdf]"            # このフォルダで
 fgm-make-markers                       # markers/ に出力
-fgm-make-markers --gate-inner 700      # 内径700mm の円形ゲート用
 ```
 
 - `marker_fgm_left.png` / `marker_fgm_right.png`: 左右の柱用。
-- `marker_fgm_ring.pdf`: 円形ゲート用（既定は内径600mm、A4 10枚）。**100%（実際のサイズ）で印刷**し、扇形に切って1周貼ります。
-  外側と内側の白も切り落とさないでください。
 
 ## 検出
 

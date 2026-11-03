@@ -42,10 +42,7 @@ Concentric stripes along the ring of a round gate. From outside to inside:
   tilt angle.
 - The outermost and innermost white modules are printed too (do not trim them). They act as quiet zones regardless of
   the gate frame color.
-- Given the gate inner diameter (`--gate-inner`, default 600 mm) and module size (`--gate-module`, default 15 mm),
-  `fgm-make-markers` splits the ring into arc segments that fit on A4 and writes an actual-size PDF
-  (`marker_fgm_ring.pdf`). 10 pages for 600 mm / 15 mm. **Print at 100% (actual size).**
-  A preview of the whole ring is `marker_fgm_ring_preview.png`.
+- A preview of the whole ring is `marker_fgm_ring_preview.png` (written by `fgm-make-markers`).
 
 ## 2. Detection
 
