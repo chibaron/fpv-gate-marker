@@ -11,7 +11,7 @@ A striped marker for FPV drone race gates, and a detector (Python / OpenCV) that
 - Lightweight: it only reads a few sparse horizontal lines (about 0.5–2 ms at 640×480, a fraction of ArUco).
 - Robust to blur, noise and interlace combing in analog video.
 
-The full specification (marker dimensions, detection steps, performance) is in [docs/spec.md](docs/spec.md) (Japanese).
+The full specification (marker dimensions, detection steps, performance) is in [docs/spec.md](docs/spec.md).
 
 ![FGM](docs/fgm.png)
 

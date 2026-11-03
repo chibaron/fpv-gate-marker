@@ -1,138 +1,167 @@
-# FpvGateMarker（FGM）仕様書
+<div align="right"><a href="./spec_jp.md">日本語はこちら</a></div>
 
-FPV ドローンのゲートに貼る、縦縞のマーカーと、その検出方法。機体のカメラの映像（アナログ 5.8GHz を想定）から、
-ゲートが「見えた」「見えない」を1フレームごとに判定する。ラップの計測（見えた→見えなくなった瞬間を通過とする）は使う側で行う。
+# FpvGateMarker (FGM) Specification
 
-この文書は、ほかの言語（C++ など）で同じ検出を作れるように、数値をすべて書く。Python の実装は `fgm/detector.py`。
-**この文書とコードが食い違ったら、どちらかを直して合わせる。**
+A vertically striped marker for FPV drone race gates, and how to detect it. From the onboard camera feed
+(analog 5.8 GHz video is assumed), the detector decides for each frame whether the gate is "visible" or "not visible".
+Lap timing (counting a pass at the moment the gate goes from visible to not visible) is up to the application.
 
-## 1. マーカー
+This document lists every number so that the same detector can be implemented in other languages (C++, etc.).
+The Python implementation is `fgm/detector.py`.
+**If this document and the code disagree, fix one of them so they match.** This English version is the reference;
+the Japanese version (`spec_jp.md`) is kept in sync with it.
 
-### 1.1 左右の柱に貼る FGM
+## 1. Markers
 
-縦縞を横方向に読む。左右2枚で1組で、太い黒がゲートの外側に来るように貼る。
-幅は黒白の比（1マス単位）で決まり、縦は自由に伸ばせる。
+### 1.1 FGM for the side posts
 
-| | 横方向の並び（左から、マス） |
+The stripes are vertical and are read horizontally. A left and a right marker form a pair, mounted so that the thick
+black band is on the outer side of the gate. The width is defined by the black/white ratios (in modules); the height
+can be as long as you like.
+
+| | Horizontal pattern (left to right, in modules) |
 | --- | --- |
-| 左マーカー（左の柱） | 白1以上 : **黒3 : 白1 : 黒1 : 白1 : 黒1** : 白1以上 |
-| 右マーカー（右の柱） | 白1以上 : **黒1 : 白1 : 黒1 : 白1 : 黒3** : 白1以上 |
+| Left marker (left post) | white ≥1 : **black 3 : white 1 : black 1 : white 1 : black 1** : white ≥1 |
+| Right marker (right post) | white ≥1 : **black 1 : white 1 : black 1 : white 1 : black 3** : white ≥1 |
 
-- 黒の部分（太字）の幅は 7 マス。これを「FGM の幅」と呼ぶ。
-- 印刷用（`fgm-make-markers`）は、外側の白を2マス（ボケに備えて）、高さを16マスにしている（`marker_fgm_left.png` / `marker_fgm_right.png`）。
-- 縦に長いほど安定し、機体が傾いても読める。1本の横線が5本の縞を全部横切れる範囲なら、傾いても比は変わらない
-  （横に切った幅が全部同じ倍率で伸びるだけ）。高さ16マスで約45°、2枚を縦につなぐと約55°まで。
+- The bold part is 7 modules wide. This is called the "FGM width".
+- The printable markers (`fgm-make-markers`) have 2 modules of white on the outer sides (to allow for blur) and are
+  16 modules tall (`marker_fgm_left.png` / `marker_fgm_right.png`).
+- Taller is more stable and still readable when the drone is tilted. As long as one horizontal line crosses all five
+  stripes, tilting does not change the ratios (every crossed width is stretched by the same factor).
+  About 45° with a height of 16 modules, about 55° with two markers stacked vertically.
 
-### 1.2 円形ゲートの輪
+### 1.2 Round gate ring
 
-円形ゲートの輪に沿って貼る同心の縞。外側から内側へ:
+Concentric stripes along the ring of a round gate. From outside to inside:
 
-**白1 : 黒3 : 白1 : 黒1 : 白1 : 黒1 : 白1**（マス）
+**white 1 : black 3 : white 1 : black 1 : white 1 : black 1 : white 1** (modules)
 
-- 中心を通る横線で切ると、左側が左マーカー、右側が右マーカーと同じ並びになる。なので検出は 1.1 と同じ
-  （輪専用の処理は無い）。円なので機体が何度傾いても読める。
-- 一番外と一番内の白1マスも印刷する（切り落とさない）。ゲートの枠の色に関係なく余白になる。
-- `fgm-make-markers` は、ゲートの内径（`--gate-inner`、既定 600mm）と1マス（`--gate-module`、既定 15mm）を指定すると、
-  A4 に入るように扇形に分けて、実寸の PDF（`marker_fgm_ring.pdf`）を出す。600mm・15mm で10枚。**100%（実際のサイズ）で印刷する。**
-  全体の見本は `marker_fgm_ring_preview.png`。
+- A horizontal line through the center crosses the left side as a left marker and the right side as a right marker,
+  so detection is the same as 1.1 (there is no ring-specific processing). Because it is a circle, it can be read at any
+  tilt angle.
+- The outermost and innermost white modules are printed too (do not trim them). They act as quiet zones regardless of
+  the gate frame color.
+- Given the gate inner diameter (`--gate-inner`, default 600 mm) and module size (`--gate-module`, default 15 mm),
+  `fgm-make-markers` splits the ring into arc segments that fit on A4 and writes an actual-size PDF
+  (`marker_fgm_ring.pdf`). 10 pages for 600 mm / 15 mm. **Print at 100% (actual size).**
+  A preview of the whole ring is `marker_fgm_ring_preview.png`.
 
-## 2. 検出
+## 2. Detection
 
-入力は1フレーム（グレー、またはカラーならグレーに変換。変換するのは (1) の横線だけでよい）。高さを `h`、幅を `w` とする。
-画素の値は 0〜255 の整数。
+The input is one frame (grayscale, or color converted to grayscale; only the lines in (1) need to be converted).
+Let `h` be its height and `w` its width. Pixel values are integers from 0 to 255.
 
-### 2.1 パラメーター
+### 2.1 Parameters
 
-| 名前 | 既定 | 意味 |
+| Name | Default | Meaning |
 | --- | --- | --- |
-| `line_step` | 4 | 何画素おきの横線を読むか |
-| `min_lines` | 3 | この本数の横線で続けて見つかったら1枚とする |
-| `min_size_pct` | 5.0 | FGM の幅（黒7マス）の最小。フレーム高さに対する % |
+| `line_step` | 4 | Read every `line_step`-th pixel row |
+| `min_lines` | 3 | A marker needs this many consecutive lines |
+| `min_size_pct` | 5.0 | Minimum FGM width (7 black modules) as % of frame height |
 
-### 2.2 定数
+### 2.2 Constants
 
-| 名前 | 値 | 意味 |
+| Name | Value | Meaning |
 | --- | --- | --- |
-| `FGM_LEFT` | (3, 1, 1, 1, 1) | 左マーカーの黒白の幅（黒から始まる） |
-| `FGM_RIGHT` | (1, 1, 1, 1, 3) | 右マーカー |
-| `FGM_TOL` | 0.5 | 1マスに対する許容誤差 |
-| `FGM_MAX_GAP` | 1 | 縦につなぐとき、読めなくてもよい横線の本数 |
-| `FGM_MIN_HEIGHT` | 0.7 | 縦に続いた長さが、幅のこの倍以上 |
-| `FGM_PAIR_GAP` | 2.0 | 左右の間が、幅（左右の平均）のこの倍以上 |
-| `FGM_PAIR_SIZE` | 3.0 | 左右の幅の比がこの倍以内 |
+| `FGM_LEFT` | (3, 1, 1, 1, 1) | Black/white widths of the left marker (starting with black) |
+| `FGM_RIGHT` | (1, 1, 1, 1, 3) | Right marker |
+| `FGM_TOL` | 0.5 | Tolerance, in modules |
+| `FGM_MAX_GAP` | 1 | Number of unreadable lines allowed when chaining vertically |
+| `FGM_MIN_HEIGHT` | 0.7 | Vertical extent must be at least this times the width |
+| `FGM_PAIR_GAP` | 2.0 | Gap between left and right must be at least this times the width (average of both) |
+| `FGM_PAIR_SIZE` | 3.0 | Ratio of left and right widths must be within this factor |
 
-### 2.3 手順
+### 2.3 Steps
 
-**(1) 読む横線**: y = `line_step // 2`, `line_step // 2 + line_step`, … (< h)。
+**(1) Lines to read**: y = `line_step // 2`, `line_step // 2 + line_step`, … (< h).
 
-**(2) 2値化**（横線ごと）
-1. 横 5 画素のガウスぼかし（縦はぼかさない。OpenCV の `GaussianBlur(ksize=(5,1), sigma=0)`。結果は整数に丸める）。
-2. 1 の結果の、横 `max(31, (w // 4) | 1)` 画素の移動平均（端は端の値を繰り返す）を四捨五入して整数にしたものを `mean` とする
-   （画素数は奇数なので、ちょうど .5 にはならない。OpenCV の uint8 の `blur` と同じ）。
-3. 1 の結果が `mean − 5` より小さければ黒、それ以外を白とする。
+**(2) Binarization** (per line)
+1. Horizontal 5-pixel Gaussian blur (no vertical blur; OpenCV `GaussianBlur(ksize=(5,1), sigma=0)`, result rounded
+   to integers).
+2. `mean` = the moving average of the result of 1 over `max(31, (w // 4) | 1)` pixels horizontally (edges replicate
+   the edge value), rounded to the nearest integer (the window size is odd, so it is never exactly .5;
+   same as OpenCV `blur` on uint8).
+3. A pixel is black if the result of 1 is less than `mean − 5`, otherwise white.
 
-**(3) 横線の中で並びを探す**（左・右の並び `P = (p0, …, p4)` ごとに）
-1. 色が変わる所（x と x−1 で色が違う x）を順に e0, e1, … とする。
-2. 連続する6個の境目 e0…e5 で、e0 が黒の始まりのものを候補とする（e0〜e1 黒、e1〜e2 白、…、e4〜e5 黒）。
-3. 1マス `u = (e4 − e0) / (p0 + p1 + p2 + p3)`（最初の黒の始まり→最後の黒の始まり）。
-4. 幅 `e5 − e0 ≥ h × min_size_pct / 100`。
-5. 「同じ色の始まり→次の同じ色の始まり」の距離 `e(j+2) − e(j)`（j = 0〜3）が、`(p(j) + p(j+1)) × u` から ±`FGM_TOL × u` 以内（ちょうど境目も含む）。
-   左なら 4:2:2:2、右なら 2:2:2:4。黒がにじんで太っても細っても、この距離は変わらない（バーコードの読み方）。
-6. 外側の白: e0 の1つ前の境目（その横線に無ければ x = 0）から e0 まで、e5 から e5 の次の境目（無ければ x = w）までが、
-   どちらも `FGM_TOL × u` 以上。
-7. 一致したものを (横線の番号, x0 = e0, x1 = e5) とする。
+**(3) Finding the pattern in a line** (for each pattern `P = (p0, …, p4)`, left and right)
+1. Let e0, e1, … be the positions where the color changes (x where pixels x and x−1 differ), in order.
+2. Each run of 6 consecutive edges e0…e5 where e0 is the start of black is a candidate
+   (e0–e1 black, e1–e2 white, …, e4–e5 black).
+3. One module `u = (e4 − e0) / (p0 + p1 + p2 + p3)` (start of the first black to start of the last black).
+4. Width `e5 − e0 ≥ h × min_size_pct / 100`.
+5. Each distance from the start of a color to the start of the next run of the same color, `e(j+2) − e(j)`
+   (j = 0–3), is within ±`FGM_TOL × u` of `(p(j) + p(j+1)) × u` (inclusive).
+   That is 4:2:2:2 for left and 2:2:2:4 for right. These distances do not change when black bleeds wider or narrower
+   (the way barcodes are read).
+6. Quiet zones: from the edge before e0 (x = 0 if there is none in the line) to e0, and from e5 to the edge after e5
+   (x = w if there is none), are both at least `FGM_TOL × u`.
+7. Each match is recorded as (line index, x0 = e0, x1 = e5).
 
-5 と 6 は、u で割ると丸めの誤差で境目ちょうどの結果が実装ごとに変わるので、両辺に `s = p0 + p1 + p2 + p3` を掛けて
-`d = e4 − e0` で比べる: 5 は `|s × (e(j+2) − e(j)) − (p(j) + p(j+1)) × d| ≤ FGM_TOL × d`、6 は `s × 余白 ≥ FGM_TOL × d`
-（左辺は整数。`FGM_TOL × d` は 0.5 刻みなので浮動小数でも正確）。
+Dividing by u in 5 and 6 makes exact boundary cases depend on rounding, so multiply both sides by
+`s = p0 + p1 + p2 + p3` and compare using `d = e4 − e0`: 5 becomes
+`|s × (e(j+2) − e(j)) − (p(j) + p(j+1)) × d| ≤ FGM_TOL × d`, and 6 becomes `s × quiet zone ≥ FGM_TOL × d`
+(the left sides are integers; `FGM_TOL × d` is a multiple of 0.5, so it is exact in floating point too).
 
-**(4) 縦につないで1枚にする**（左・右それぞれ。候補を横線の番号順、同じ横線なら x0 の順に見る）
-1. 候補ごとに、作ってある鎖を作った順に見て、次をすべて満たす最初の鎖につなぐ。無ければ新しい鎖を作る。
-   - 鎖の最後の横線との番号の差 `gap` が 1 以上 `FGM_MAX_GAP + 1` 以下。
-   - 中心 `(x0 + x1) / 2` のずれが `line_step × gap + 幅 / 7` 以下（機体が傾いても続くように）。
-   - 幅の比（今の候補 / 鎖の最後）が 0.7 以上 1.43 以下。
-2. 横線が `min_lines` 本以上の鎖を残す。
-3. 鎖の最初と最後の横線の y を y0, y1、幅の平均を W とし、`y1 − y0 + line_step < FGM_MIN_HEIGHT × W` なら除く
-   （OSD の文字や ArUco の1マスのように、低い所だけ比が合うものを除く。0.5 倍では OSD の文字を誤検出した）。
-4. 残った鎖が1枚の FGM。x0・x1 は鎖の平均、四隅は (最初の x0, y0)、(最初の x1, y0)、(最後の x1, y1)、(最後の x0, y1)。
+**(4) Chaining vertically into one marker** (left and right separately; candidates are visited in line order,
+then by x0 within a line)
+1. For each candidate, look at the existing chains in creation order and append it to the first chain that satisfies
+   all of the following. If none does, start a new chain.
+   - The line index difference `gap` from the chain's last line is between 1 and `FGM_MAX_GAP + 1`.
+   - The center `(x0 + x1) / 2` moves by at most `line_step × gap + width / 7` (so the chain continues when the drone
+     is tilted).
+   - The width ratio (this candidate / the chain's last) is between 0.7 and 1.43.
+2. Keep chains with at least `min_lines` lines.
+3. Let y0, y1 be the y of the chain's first and last lines and W the average width. Drop the chain if
+   `y1 − y0 + line_step < FGM_MIN_HEIGHT × W` (this removes short matches such as OSD characters or a single ArUco
+   module; 0.5 still produced false positives on OSD characters).
+4. Each remaining chain is one FGM. x0 and x1 are the chain averages; the corners are (first x0, y0), (first x1, y0),
+   (last x1, y1), (last x0, y1).
 
-**(5) ゲートの判定**: 左の FGM `L` と右の FGM `R` の組で、次を満たすものが1つでもあれば「左右の両方が見えた」。
+**(5) Gate check**: "both left and right are visible" if at least one pair of a left FGM `L` and a right FGM `R`
+satisfies:
 - `max(L.W, R.W) ≤ FGM_PAIR_SIZE × min(L.W, R.W)`
-- `R.x0 − L.x1 ≥ FGM_PAIR_GAP × (L.W + R.W) / 2`（左が右より左にあり、ゲートの幅ぶん離れている。OSD の文字のように隣り合ったものを除く）
+- `R.x0 − L.x1 ≥ FGM_PAIR_GAP × (L.W + R.W) / 2` (left is to the left of right and they are a gate width apart;
+  this removes adjacent matches such as OSD characters)
 
-**(6) 見えた・見えない**（前のフレームの状態 `seen` を持つ。最初は false）
-- 「左右の両方が見えた」なら `seen = true`。
-- そうでなく、FGM が1枚も無ければ（左も右も） `seen = false`。
-- それ以外（片方だけ、または組にならない）は、前のフレームのまま。
-- `seen` がそのフレームの結果。
+**(6) Visible / not visible** (keeps the previous frame's state `seen`, initially false)
+- If "both left and right are visible", `seen = true`.
+- Otherwise, if there is no FGM at all (neither left nor right), `seen = false`.
+- Otherwise (only one side, or no valid pair), keep the previous frame's value.
+- `seen` is the result for the frame.
 
-つまり、見えていない状態から片方だけ見えても「見えた」にはしない。いったん「見えた」になったら、左右の両方とも消えるまで「見えた」のまま。
-ゲートに近づくと片方が先に画面から出るが、そこを通過にせず、最後の1枚が消えたときに通過になる。
-状態を持つので、**映像（カメラ）ごとに検出器を1つ作る**。映像が切り替わったら `reset()` する。
+In other words, seeing only one side while not visible does not make it visible. Once visible, it stays visible until
+both sides are gone. When approaching a gate, one side leaves the frame first; that is not a pass — the pass happens
+when the last marker disappears. Because it keeps state, **create one detector per video stream (camera)**,
+and call `reset()` when the stream switches.
 
-### 2.4 出力
+### 2.4 Output
 
-- `visible`: (6) の `seen`。
-- `corners`, `ids`: 見つかった FGM ごとの四隅と `"L"` / `"R"`（片方だけでも出る。ゲートの調整用の枠の表示に使う）。
+- `visible`: `seen` from (6).
+- `corners`, `ids`: the corners of each FGM found and `"L"` / `"R"` (reported even for one side only; used to draw
+  frames when setting up gates).
 
-## 3. 性能（`tools/bench.py`）
+## 3. Performance (`tools/bench.py`)
 
-ArUco（DICT_4X4_50、ID 0〜3）と比べた。大きさは黒い部分の幅（ArUco は1辺、FGM は黒7マス）でそろえ、設定は既定値。
+Compared with ArUco (DICT_4X4_50, IDs 0–3). Sizes are matched by the width of the black part (one side for ArUco,
+7 black modules for FGM), with default settings.
 
-- 処理時間（640×480、1フレーム）: 合成映像でマーカーが映っていると ArUco 約13ms、FGM 約2ms、映っていないと
-  ArUco 約1.4ms、FGM 約0.5ms。FPV の練習動画では ArUco 平均 4.8ms、FGM 2.5ms（FGM は高速化の前に測った値）。
-  画像が小さいので、OpenCV のスレッドを1本にする（`cv2.setNumThreads(1)`）とさらに速い（合成映像で約0.3〜1ms）。
-- 認識率（合成映像、30・40px、各10回）
-  - きれい・軽いボケでは、ArUco・FGM（柱）・FGM（円形ゲート）の3つとも 100%。
-  - 強いボケ＋ノイズ＋インターレースの櫛状のずれ（σ2・ノイズ15・6px）では ArUco 0%、FGM（柱・円形ゲート）100%。
-  - 傾き60°では柱の FGM は 0%（ArUco・円形ゲートは読める）。
-  - 斜め（横0.6倍）は最小サイズを割るので、どれも約50%。
-- 読める最小の大きさ: ArUco 約30px、FGM（柱）約24px、FGM（円形ゲート）約20px。ArUco は1枚で読めるので、
-  ゲートが画面からはみ出す近さでも読める。
-- 誤検出（マーカーの無い練習動画12本・約14分）: どちらも 0。最初の版は OSD の文字（白い文字の黒い縁取り）を左右1組と読み、
-  通過を6回誤検出したので、縦の長さと左右の間隔の条件（2.3 の (4)-3 と (5)）を足した。
+- Processing time (640×480, per frame): on synthetic video with markers, ArUco about 13 ms, FGM about 2 ms; without
+  markers, ArUco about 1.4 ms, FGM about 0.5 ms. On FPV practice videos, ArUco 4.8 ms and FGM 2.5 ms on average
+  (FGM measured before the speedup). The images are small, so OpenCV with a single thread (`cv2.setNumThreads(1)`)
+  is faster still (about 0.3–1 ms on synthetic video).
+- Detection rate (synthetic video, 30 and 40 px, 10 trials each)
+  - Clean and lightly blurred: 100% for ArUco, FGM (posts) and FGM (round gate).
+  - Strong blur + noise + interlace combing (σ2, noise 15, 6 px): ArUco 0%, FGM (posts and round gate) 100%.
+  - Tilted 60°: FGM posts 0% (ArUco and the round gate can be read).
+  - Oblique (0.6× horizontally): falls below the minimum size, about 50% for all.
+- Minimum readable size: ArUco about 30 px, FGM (posts) about 24 px, FGM (round gate) about 20 px. ArUco can be read
+  from a single marker, so it still works when the gate is so close that it overflows the frame.
+- False positives (12 practice videos without markers, about 14 minutes): 0 for both. The first version read OSD
+  characters (white text with black outlines) as a left/right pair and counted 6 false passes, so the conditions on
+  vertical extent and left/right spacing (2.3 (4)-3 and (5)) were added.
 
-アナログ映像に強い理由: インターレースの櫛状のずれは1行の中では同じフィールドなので影響しない。横線のノイズは読めない行が1本減るだけ。
-縦方向のブレにも強い。
+Why it is robust to analog video: interlace combing does not matter within a single line because a line belongs to one
+field. Noise on a line only costs one readable line. It is also robust to vertical motion blur.
 
-本物の FGM を映した映像での認識率は、まだ測っていない。
+The detection rate on video of real FGM markers has not been measured yet.
