@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fpv-gate-marker"
+version = "0.1.0"
+description = "FpvGateMarker (FGM): stripe markers for FPV drone gates and a fast scan-line detector"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "chibaron" }]
+requires-python = ">=3.9"
+# OpenCV は入れない（opencv-python と opencv-contrib-python を両方入れると壊れるので、使う側が選ぶ）
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+opencv = ["opencv-python>=4.7"]
+pdf = ["Pillow"]                 # 円形ゲート用の PDF
+
+[project.scripts]
+fgm-make-markers = "fgm.markers:main"
+
+[tool.setuptools]
+packages = ["fgm"]
