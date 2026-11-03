@@ -4,7 +4,7 @@
     python tools/bench.py --videos a.mp4 b.mp4    # also count processing time and false positives on videos without markers
 
 Detection rate is measured by placing markers on synthetic video (640x480, smooth patterned background). Sizes are
-matched in px by "width of the black part" (one side for ArUco, the width of the 5 black bars for FGM). Default
+matched in px by "width of the black part" (one side for ArUco, the 7 black modules for FGM). Default
 settings (minimum size 5%).
 False positives are the number of frames judged "visible" over all frames, and the number of passes
 (visible -> not visible for 100 ms, i.e. false laps).
@@ -16,7 +16,7 @@ ArUco と FpvGateMarker（FGM）の性能を比べる（処理時間・認識率
     python tools/bench.py --videos a.mp4 b.mp4    # 加えて、マーカーの無い動画で処理時間と誤検出を数える
 
 認識率は合成映像（640×480、背景は滑らかな模様）にマーカーを置いて測る。大きさは
-「黒い部分の幅」（ArUco は1辺、FGM は黒5本の幅）を px でそろえる。設定は既定値（最小サイズ 5%）。
+「黒い部分の幅」（ArUco は1辺、FGM は黒7マス）を px でそろえる。設定は既定値（最小サイズ 5%）。
 誤検出は、動画の全フレームで「見えた」とした数と、通過の数（見えた→100ms 見えない。= 誤ったラップ）。
 ArUco は DICT_4X4_50 の ID 0〜3（TinyViewPlus のマーカーと同じ）。
 """
