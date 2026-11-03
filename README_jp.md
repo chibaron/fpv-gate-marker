@@ -71,8 +71,6 @@ python tests/test_fgm.py                    # 合成映像でのテスト
 python tools/bench.py --videos a.mp4        # ArUco との比較（処理時間・認識率・誤検出）
 ```
 
-使っているアプリ: d-plactice-ArUco（FPV ドローンのラップタイマー）
-
 ## ライセンス
 
 MIT

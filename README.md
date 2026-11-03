@@ -76,8 +76,6 @@ python tests/test_fgm.py                    # tests on synthetic video
 python tools/bench.py --videos a.mp4        # comparison with ArUco (speed, detection rate, false positives)
 ```
 
-Used by: d-plactice-ArUco (an FPV drone lap timer)
-
 ## License
 
 MIT

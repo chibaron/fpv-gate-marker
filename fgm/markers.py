@@ -1,4 +1,15 @@
-"""FGM の印刷用画像を作る（左右の PNG、円形ゲート用の輪の PDF）。
+"""Make printable FGM images (left/right PNGs, round gate ring PDF).
+
+    fgm-make-markers                       # write to markers/ (same as python -m fgm.markers)
+    fgm-make-markers --module 100 --height 24
+    fgm-make-markers --gate-inner 700 --gate-module 15   # ring for a round gate (700 mm inner diameter)
+
+The round gate ring (marker_fgm_ring.pdf) is a set of concentric stripes along the gate ring. A horizontal line
+through the center crosses the left side as FGM left and the right side as FGM right, so FgmDetector reads it
+(being a circle, it reads at any tilt). It is split into arc segments that fit on A4, at actual size.
+Print at 100% (actual size). The PDF needs Pillow (pip install fpv-gate-marker[pdf]).
+
+FGM の印刷用画像を作る（左右の PNG、円形ゲート用の輪の PDF）。
 
     fgm-make-markers                       # markers/ に出力（python -m fgm.markers でも同じ）
     fgm-make-markers --module 100 --height 24
@@ -20,12 +31,14 @@ import numpy as np
 
 from .detector import FGM_LEFT, FGM_RIGHT
 
-FGM_QUIET = 2   # FGM の外側の白（マス）。読むのに必要なのは1マスだが、ボケに備えて2マス
-GATE_QUIET = 1  # 円形ゲートの輪の、一番外と一番内の白（マス）
+FGM_QUIET = 2   # white outside the FGM (modules); 1 is enough to read, 2 allows for blur / FGM の外側の白（マス）。読むのに必要なのは1マスだが、ボケに備えて2マス
+GATE_QUIET = 1  # white at the outermost and innermost edges of the round gate ring (modules) / 円形ゲートの輪の、一番外と一番内の白（マス）
 
 
 def fgm_marker(pattern, module_px: int, height_modules: int) -> np.ndarray:
-    """縦縞の FGM。左右に FGM_QUIET マスの白い余白を付ける。"""
+    """A striped FGM with FGM_QUIET modules of white margin on the left and right.
+
+    縦縞の FGM。左右に FGM_QUIET マスの白い余白を付ける。"""
     cols = [255] * FGM_QUIET
     for k, n in enumerate(pattern):
         cols += [0 if k % 2 == 0 else 255] * n
@@ -35,18 +48,23 @@ def fgm_marker(pattern, module_px: int, height_modules: int) -> np.ndarray:
 
 
 def _gate_ring_color(r_mm, inner_mm: float, module_mm: float):
-    """円形ゲートの輪で、中心からの距離 r_mm の色（黒 0 / 白 255）。輪の外は -1。
+    """Color of the round gate ring at distance r_mm from the center (black 0 / white 255); -1 outside the ring.
+    From outside: white 1 -> FGM_LEFT (thick black outside) -> white 1.
+
+    円形ゲートの輪で、中心からの距離 r_mm の色（黒 0 / 白 255）。輪の外は -1。
     外側から 白1 → FGM_LEFT（太い黒が外側）→ 白1。"""
-    radial = [GATE_QUIET] + list(FGM_LEFT) + [GATE_QUIET]    # 外側→内側の幅（マス）
+    radial = [GATE_QUIET] + list(FGM_LEFT) + [GATE_QUIET]    # widths from outside to inside (modules) / 外側→内側の幅（マス）
     r_in = inner_mm / 2
     r_out = r_in + sum(radial) * module_mm
     k = np.searchsorted(np.cumsum(radial) * module_mm, r_out - r_mm, side="right")
-    color = np.where(k % 2 == 1, 0, 255)                      # 0番目（一番外）が白、次が黒…
+    color = np.where(k % 2 == 1, 0, 255)                      # band 0 (outermost) is white, then black... / 0番目（一番外）が白、次が黒…
     return np.where((r_mm >= r_in) & (r_mm <= r_out), color, -1)
 
 
 def gate_ring_image(inner_px: int, module_px: float) -> np.ndarray:
-    """円形ゲートの輪の全体（画素単位。プレビューとテスト用）。輪の外は灰色。"""
+    """The whole round gate ring (in pixels; for previews and tests). Gray outside the ring.
+
+    円形ゲートの輪の全体（画素単位。プレビューとテスト用）。輪の外は灰色。"""
     r_out = inner_px / 2 + (sum(FGM_LEFT) + 2 * GATE_QUIET) * module_px
     size = int(math.ceil(r_out * 2)) + 2
     yy, xx = np.mgrid[0:size, 0:size]
@@ -55,23 +73,27 @@ def gate_ring_image(inner_px: int, module_px: float) -> np.ndarray:
 
 
 def gate_ring_pages(inner_mm: float, module_mm: float, dpi: int, paper=(210, 297), margin=10):
-    """円形ゲートの輪を、紙に入る扇形に分けて実寸で描く。(ページの画像のリスト, 分割数) を返す。"""
+    """Draw the round gate ring at actual size, split into arc segments that fit on paper.
+    Returns (list of page images, number of segments).
+
+    円形ゲートの輪を、紙に入る扇形に分けて実寸で描く。(ページの画像のリスト, 分割数) を返す。"""
     r_in = inner_mm / 2
     r_out = r_in + (sum(FGM_LEFT) + 2 * GATE_QUIET) * module_mm
     pw, ph = paper[0] - 2 * margin, paper[1] - 2 * margin
-    for n in range(3, 200):                  # 紙（縦か横）に入る最小の分割数
+    for n in range(3, 200):                  # fewest segments that fit the paper (portrait or landscape) / 紙（縦か横）に入る最小の分割数
         half = math.pi / n
         bw, bh = 2 * r_out * math.sin(half), r_out - r_in * math.cos(half)
         if bw <= pw and bh <= ph:
             size = paper
             break
         if bw <= ph and bh <= pw:
-            size = (paper[1], paper[0])      # 横向き
+            size = (paper[1], paper[0])      # landscape / 横向き
             break
     else:
-        raise ValueError("輪の幅が紙に入りません。1マス（gate_module）を小さくしてください")
-    ppm = dpi / 25.4                         # 1mm の画素数
+        raise ValueError("The ring does not fit on the paper. Use a smaller module (gate_module).")
+    ppm = dpi / 25.4                         # pixels per mm / 1mm の画素数
     W, H = int(size[0] * ppm), int(size[1] * ppm)
+    # Place the segment pointing up, centered on the paper. The circle center is below it (off the paper).
     # 扇形を上向きに置き、紙の中央に。円の中心は扇形の下（紙の外）にある
     cx, cy = W / 2, H / 2 + ((r_out + r_in * math.cos(half)) / 2) * ppm
     yy, xx = np.mgrid[0:H, 0:W]
@@ -79,6 +101,7 @@ def gate_ring_pages(inner_mm: float, module_mm: float, dpi: int, paper=(210, 297
     c = _gate_ring_color(np.hypot(x, y), inner_mm, module_mm)
     c[np.abs(np.arctan2(x, y)) > half] = -1
     page = np.where(c < 0, 255, c).astype(np.uint8)
+    # Cut line (gray): the outer and inner arcs and both ends of the segment
     # 切り取り線（灰色）。扇形の外周・内周と両端
     t = np.linspace(-half, half, 200)
     outline = np.concatenate([np.stack([np.sin(t), np.cos(t)], 1) * r_out,
@@ -97,7 +120,9 @@ def gate_ring_pages(inner_mm: float, module_mm: float, dpi: int, paper=(210, 297
 
 def write_markers(out: str, module_px: int = 80, height_modules: int = 16, gate_inner: float = 600,
                   gate_module: float = 15, dpi: int = 200) -> list[str]:
-    """左右の PNG・円形ゲートの PDF・その見本を out に書き、書いたファイルのパスを返す。"""
+    """Write the left/right PNGs, the round gate PDF and its preview to out, and return the paths written.
+
+    左右の PNG・円形ゲートの PDF・その見本を out に書き、書いたファイルのパスを返す。"""
     os.makedirs(out, exist_ok=True)
     paths = []
     for name, pattern in (("left", FGM_LEFT), ("right", FGM_RIGHT)):
@@ -111,19 +136,19 @@ def write_markers(out: str, module_px: int = 80, height_modules: int = 16, gate_
     imgs[0].save(path, "PDF", resolution=dpi, save_all=True, append_images=imgs[1:])
     paths.append(path)
     path = os.path.join(out, "marker_fgm_ring_preview.png")
-    cv2.imwrite(path, gate_ring_image(400, 400 / gate_inner * gate_module))   # 全体の見本（縮小）
+    cv2.imwrite(path, gate_ring_image(400, 400 / gate_inner * gate_module))   # preview of the whole ring (scaled down) / 全体の見本（縮小）
     paths.append(path)
     return paths
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="FGM の印刷用画像を作る")
-    p.add_argument("--module", type=int, default=80, help="FGM の1マスの画素数")
-    p.add_argument("--height", type=int, default=16, help="FGM の高さ（マス）")
-    p.add_argument("--gate-inner", type=float, default=600, help="円形ゲートの内径（mm）。輪はこの外側に貼る")
-    p.add_argument("--gate-module", type=float, default=15, help="円形ゲートの輪の1マス（mm）")
-    p.add_argument("--dpi", type=int, default=200, help="円形ゲート用 PDF の解像度")
-    p.add_argument("--out", default="markers")
+    p = argparse.ArgumentParser(description="Make printable FGM images")
+    p.add_argument("--module", type=int, default=80, help="pixels per FGM module")
+    p.add_argument("--height", type=int, default=16, help="FGM height (modules)")
+    p.add_argument("--gate-inner", type=float, default=600, help="round gate inner diameter (mm); the ring goes outside it")
+    p.add_argument("--gate-module", type=float, default=15, help="round gate ring module size (mm)")
+    p.add_argument("--dpi", type=int, default=200, help="resolution of the round gate PDF")
+    p.add_argument("--out", default="markers", help="output folder")
     a = p.parse_args(argv)
     try:
         paths = write_markers(a.out, a.module, a.height, a.gate_inner, a.gate_module, a.dpi)
