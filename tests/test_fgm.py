@@ -68,7 +68,8 @@ def test_detector():
     assert not fresh(frame_with_fgm(left=False))
     assert not fresh(frame_with_fgm(swap=True))                       # left and right swapped / 左右が逆
     assert not fresh(frame_with_fgm(height=4))                        # too short (OSD characters etc.) / 背が低い（OSD の文字など）
-    assert not fresh(frame_with_fgm(xs=(250, 330)))                   # too close together (not a gate) / 左右が近すぎる（ゲートでない）
+    assert not fresh(frame_with_fgm(xs=(300, 340)))                   # touching (not a gate) / 左右がくっついている（ゲートでない）
+    assert fresh(frame_with_fgm(xs=(250, 330)))                       # close but apart / 近いが離れている
     assert fresh(frame_with_fgm(xs=(150, 500)))
     assert not fresh(blank())
     assert not fresh(frame_with_aruco())                              # ArUco is not read as FGM / ArUco は FGM として読まない

@@ -25,8 +25,8 @@ FGM_MAX_GAP = 1               # unreadable scan lines allowed in a vertical chai
 # Vertical extent must be at least this times the width (rejects short matches such as OSD characters or one ArUco module)
 # 縦に続いた長さが幅のこの倍以上（OSD の文字や ArUco の1マス分だけの一致を除く）
 FGM_MIN_HEIGHT = 0.7
-FGM_PAIR_GAP = 2.0            # left-right gap must be at least this times the FGM width (gate width) / 左と右の間が、FGM の幅のこの倍以上空いていること（ゲートの幅）
-FGM_PAIR_SIZE = 3.0           # left/right width ratio must be within this factor / 左と右の幅の比がこの倍以内であること
+FGM_PAIR_GAP = 0.2            # left-right gap must be at least this times the FGM width / 左と右の間が、FGM の幅のこの倍以上空いていること
+FGM_PAIR_SIZE = 2.0           # left/right width ratio must be within this factor / 左と右の幅の比がこの倍以内であること
 
 
 @dataclass
@@ -112,7 +112,7 @@ class FgmDetector:
 
     On each scan line it looks for black/white runs matching the ratios. If a match continues at the same
     position on at least `min_lines` scan lines and its extent is at least FGM_MIN_HEIGHT times its width,
-    it is one marker. When both are seen, left to the left of right and a gate width apart, the gate is
+    it is one marker. When both are seen, left to the left of right and not touching, the gate is
     "visible". Once visible, it stays visible until both sides are gone (one side leaving the frame as you
     approach is not a pass). Create one per video stream (camera); it keeps state from the previous frame.
     A round gate ring (fgm.markers.gate_ring_pages) is read too, because a horizontal line through its center
@@ -122,7 +122,7 @@ class FgmDetector:
 
     走査線ごとに黒白の並びが比率に合う所を探し、`min_lines` 本以上の走査線で同じ位置に
     続いていて、その長さが幅の FGM_MIN_HEIGHT 倍以上なら1枚のマーカーとする。
-    左が右より左に、ゲートの幅ぶん離れて、両方見えたら「見えた」。いったん見えたら、
+    左が右より左に、くっつかずに離れて、両方見えたら「見えた」。いったん見えたら、
     左右の両方とも見えなくなるまで「見えた」のまま（近づいて片方が画面から出ても通過にしない）。
     映像（カメラ）ごとに1つ作る（前のフレームの状態を持つ）。
     円形ゲートの輪（fgm.markers.gate_ring_pages）も、中心を通る横線の左右がこの並びになるので読める。
