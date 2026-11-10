@@ -145,6 +145,21 @@ def test_write_markers():
         assert left.shape == (16 * 4, (sum(FGM_LEFT) + 4) * 4)       # 2-module margins, 16 modules tall / 余白2マスずつ・高さ16マス
 
 
+def test_print_files():
+    """The files in print/ are what fgm-make-markers writes with the defaults (regenerate them when the markers change:
+    python -m fgm.markers --out print).
+
+    print/ のファイルは、fgm-make-markers を既定の設定で出したものと同じ（マーカーを変えたら
+    python -m fgm.markers --out print で作り直す）。"""
+    d = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "print")
+    expected = {"marker_fgm_left.png": fgm_marker(FGM_LEFT, 80, 16),
+                "marker_fgm_right.png": fgm_marker(FGM_RIGHT, 80, 16),
+                "marker_fgm_ring_preview.png": gate_ring_image(400, 400 / 600 * 15)}
+    for name, img in expected.items():
+        assert np.array_equal(cv2.imread(os.path.join(d, name), cv2.IMREAD_GRAYSCALE), img), name
+    assert os.path.getsize(os.path.join(d, "marker_fgm_ring.pdf")) > 0
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

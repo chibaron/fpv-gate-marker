@@ -26,7 +26,8 @@ can be as long as you like.
 
 - The bold part is 7 modules wide. This is called the "FGM width".
 - The printable markers (`fgm-make-markers`) have 2 modules of white on the outer sides (to allow for blur) and are
-  16 modules tall (`marker_fgm_left.png` / `marker_fgm_right.png`).
+  16 modules tall (`marker_fgm_left.png` / `marker_fgm_right.png`, 80 px per module). The files made with the
+  default settings are in `print/` (along with the round gate ring below, for a 600 mm inner diameter).
 - Taller is more stable and still readable when the drone is tilted. As long as one horizontal line crosses all five
   stripes, tilting does not change the ratios (every crossed width is stretched by the same factor).
   About 45° with a height of 16 modules, about 55° with two markers stacked vertically.

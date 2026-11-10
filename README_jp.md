@@ -27,14 +27,21 @@ FPV ドローンのゲートに貼る縦縞のマーカーと、機体のカメ�
 テープ3本ぶんの黒・1本ぶんの隙間・1本・隙間・1本です（読むのは比なので、多少ずれても読めます）。
 外側にも1マス以上の白を残してください。
 
-印刷用の画像を作る:
+印刷用のファイルは [print/](print/) にあります（Python は要りません）:
+
+- [marker_fgm_left.png](print/marker_fgm_left.png) / [marker_fgm_right.png](print/marker_fgm_right.png): 左右の柱用
+  （横11 × 縦16マス）。縦横の比を変えなければ、どの大きさで印刷してもよい。
+- [marker_fgm_ring.pdf](print/marker_fgm_ring.pdf): 内径600mm の円形ゲート用の輪（1マス15mm、外径870mm）を、
+  A4 10枚の扇形に分けたもの。100%（実際のサイズ）で印刷し、灰色の線で切ってゲートに1周貼る。
+  全体の見本は [marker_fgm_ring_preview.png](print/marker_fgm_ring_preview.png)。
+
+ほかの大きさ（内径の違う円形ゲートなど）は Python で作れます:
 
 ```
 pip install ".[opencv,pdf]"            # このフォルダで
 fgm-make-markers                       # markers/ に出力
+fgm-make-markers --gate-inner 700 --gate-module 15   # 内径700mm のゲート用の輪
 ```
-
-- `marker_fgm_left.png` / `marker_fgm_right.png`: 左右の柱用。
 
 ## 検出
 

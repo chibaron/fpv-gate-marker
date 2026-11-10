@@ -34,12 +34,21 @@ The detector reads ratios, so small errors are fine. Leave at least one module o
 
 ### Printing
 
+Ready-to-print files are in [print/](print/) (no Python needed):
+
+- [marker_fgm_left.png](print/marker_fgm_left.png) / [marker_fgm_right.png](print/marker_fgm_right.png): for the left
+  and right posts (11 × 16 modules). Print at any size, keeping the aspect ratio.
+- [marker_fgm_ring.pdf](print/marker_fgm_ring.pdf): ring for a round gate with a 600 mm inner diameter (15 mm modules,
+  870 mm outer diameter), in 10 A4 arc segments. Print at 100% (actual size), cut along the gray lines and stick them
+  around the gate. [marker_fgm_ring_preview.png](print/marker_fgm_ring_preview.png) shows the whole ring.
+
+For other sizes (e.g. a different gate diameter), make them with Python:
+
 ```
 pip install ".[opencv,pdf]"            # in this folder
 fgm-make-markers                       # writes to markers/
+fgm-make-markers --gate-inner 700 --gate-module 15   # ring for a 700 mm gate
 ```
-
-- `marker_fgm_left.png` / `marker_fgm_right.png`: for the left and right posts.
 
 ## Detection
 
