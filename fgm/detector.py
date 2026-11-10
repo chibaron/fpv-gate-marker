@@ -26,7 +26,7 @@ FGM_MAX_GAP = 1               # unreadable scan lines allowed in a vertical chai
 # 縦に続いた長さが幅のこの倍以上（OSD の文字や ArUco の1マス分だけの一致を除く）
 FGM_MIN_HEIGHT = 0.7
 FGM_PAIR_GAP = 0.2            # left-right gap must be at least this times the FGM width / 左と右の間が、FGM の幅のこの倍以上空いていること
-FGM_PAIR_SIZE = 2.0           # left/right width ratio must be within this factor / 左と右の幅の比がこの倍以内であること
+FGM_PAIR_SIZE = 1.5           # left/right width ratio must be within this factor / 左と右の幅の比がこの倍以内であること
 
 
 @dataclass

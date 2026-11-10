@@ -67,7 +67,7 @@ Let `h` be its height and `w` its width. Pixel values are integers from 0 to 255
 | `FGM_MAX_GAP` | 1 | Number of unreadable lines allowed when chaining vertically |
 | `FGM_MIN_HEIGHT` | 0.7 | Vertical extent must be at least this times the width |
 | `FGM_PAIR_GAP` | 0.2 | Gap between left and right must be at least this times the width (average of both) |
-| `FGM_PAIR_SIZE` | 2.0 | Ratio of left and right widths must be within this factor |
+| `FGM_PAIR_SIZE` | 1.5 | Ratio of left and right widths must be within this factor |
 
 ### 2.3 Steps
 
