@@ -57,6 +57,12 @@ Let `h` be its height and `w` its width. Pixel values are integers from 0 to 255
 | `line_step` | 4 | Read every `line_step`-th pixel row |
 | `min_lines` | 3 | A marker needs this many consecutive lines |
 | `min_size_pct` | 5.0 | Minimum FGM width (7 black modules) as % of frame height |
+| `tol` | 0.25 | Tolerance of the stripe spacing, in modules (`FGM_TOL`) |
+
+`tol` trades false positives against small markers. With 0.5, OSD characters (such as "CRASH FLIP" after a crash, or
+the statistics screen after landing) matched as a left and right pair: 12 false passes in two practice videos with
+markers (about 6 minutes). With 0.25, all 14 real passes were still read and there were no false passes. Smaller values
+make small (distant) markers harder to read: a module there is only about 3 pixels, so `tol × u` is under one pixel.
 
 ### 2.2 Constants
 
@@ -64,7 +70,6 @@ Let `h` be its height and `w` its width. Pixel values are integers from 0 to 255
 | --- | --- | --- |
 | `FGM_LEFT` | (3, 1, 1, 1, 1) | Black/white widths of the left marker (starting with black) |
 | `FGM_RIGHT` | (1, 1, 1, 1, 3) | Right marker |
-| `FGM_TOL` | 0.5 | Tolerance, in modules |
 | `FGM_MAX_GAP` | 1 | Number of unreadable lines allowed when chaining vertically |
 | `FGM_MIN_HEIGHT` | 0.7 | Vertical extent must be at least this times the width |
 | `FGM_PAIR_GAP` | 0.2 | Gap between left and right must be at least this times the width (average of both) |
@@ -89,17 +94,18 @@ Let `h` be its height and `w` its width. Pixel values are integers from 0 to 255
 3. One module `u = (e4 − e0) / (p0 + p1 + p2 + p3)` (start of the first black to start of the last black).
 4. Width `e5 − e0 ≥ h × min_size_pct / 100`.
 5. Each distance from the start of a color to the start of the next run of the same color, `e(j+2) − e(j)`
-   (j = 0–3), is within ±`FGM_TOL × u` of `(p(j) + p(j+1)) × u` (inclusive).
+   (j = 0–3), is within ±`tol × u` of `(p(j) + p(j+1)) × u` (inclusive).
    That is 4:2:2:2 for left and 2:2:2:4 for right. These distances do not change when black bleeds wider or narrower
    (the way barcodes are read).
 6. Quiet zones: from the edge before e0 (x = 0 if there is none in the line) to e0, and from e5 to the edge after e5
-   (x = w if there is none), are both at least `FGM_TOL × u`.
+   (x = w if there is none), are both at least `tol × u`.
 7. Each match is recorded as (line index, x0 = e0, x1 = e5).
 
 Dividing by u in 5 and 6 makes exact boundary cases depend on rounding, so multiply both sides by
 `s = p0 + p1 + p2 + p3` and compare using `d = e4 − e0`: 5 becomes
-`|s × (e(j+2) − e(j)) − (p(j) + p(j+1)) × d| ≤ FGM_TOL × d`, and 6 becomes `s × quiet zone ≥ FGM_TOL × d`
-(the left sides are integers; `FGM_TOL × d` is a multiple of 0.5, so it is exact in floating point too).
+`|s × (e(j+2) − e(j)) − (p(j) + p(j+1)) × d| ≤ tol × d`, and 6 becomes `s × quiet zone ≥ tol × d`
+(the left sides are integers; with the default 0.25, `tol × d` is a multiple of 0.25, so it is exact in floating point
+too. A value such as 0.3 is not exact in binary, so exact boundary cases may differ between implementations).
 
 **(4) Chaining vertically into one marker** (left and right separately; candidates are visited in line order,
 then by x0 within a line)

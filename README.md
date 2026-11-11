@@ -70,6 +70,7 @@ d.corners, d.ids                    # corners of each FGM found, and "L" / "R" (
 | `line_step` | 4 | Read every Nth pixel row |
 | `min_lines` | 3 | Number of consecutive rows needed to accept a marker |
 | `min_size_pct` | 5.0 | Minimum marker width (black part) as % of frame height. Ignores distant gates |
+| `tol` | 0.25 | Tolerance of the stripe spacing, in modules. Smaller means fewer false positives (OSD characters etc.) but small markers become harder to read |
 
 For small images such as 640×480, OpenCV runs faster with a single thread (`cv2.setNumThreads(1)`).
 This is a process-wide setting, so the detector does not change it.

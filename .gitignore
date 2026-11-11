@@ -1,6 +1,9 @@
 # fgm-make-markers の出力
 markers/
 
+# 確かめに使う動画（大きいので入れない）
+/sample/
+
 # Claude Code 用の手元のメモ
 CLAUDE.md
 

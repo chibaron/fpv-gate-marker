@@ -29,7 +29,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from fgm import FGM_LEFT, FGM_RIGHT, FgmDetector  # noqa: E402
+from fgm import FGM_LEFT, FGM_RIGHT, FGM_TOL, FgmDetector  # noqa: E402
 from fgm.markers import fgm_marker, gate_ring_image  # noqa: E402
 
 W, H = 640, 480
@@ -237,14 +237,15 @@ def main():
     p.add_argument("--videos", nargs="*", default=[], help="videos without markers (count false positives and processing time)")
     p.add_argument("--trials", type=int, default=10, help="trials per condition for the detection rate")
     p.add_argument("--save", help="folder to save falsely detected frames")
+    p.add_argument("--tol", type=float, default=FGM_TOL, help="FgmDetector tol (tolerance in modules)")
     a = p.parse_args()
     if a.save:
         os.makedirs(a.save, exist_ok=True)
 
     widths = [16, 20, 24, 30, 40, 60, 100, 160]
     dets = {"ArUco": (MarkerDetector(), scene_aruco),
-            "FGM(posts)": (FgmDetector(), scene_fgm_posts),
-            "FGM(ring)": (FgmDetector(), scene_fgm_ring)}
+            "FGM(posts)": (FgmDetector(tol=a.tol), scene_fgm_posts),
+            "FGM(ring)": (FgmDetector(tol=a.tol), scene_fgm_ring)}
 
     print("== Processing time (ms per frame, 640x480) ==")
     rng = np.random.default_rng(1)
@@ -276,7 +277,7 @@ def main():
 
     if a.videos:
         print("\n== False positives (videos without markers) ==")
-        fp_dets = {"ArUco": MarkerDetector(), "FGM": FgmDetector()}
+        fp_dets = {"ArUco": MarkerDetector(), "FGM": FgmDetector(tol=a.tol)}
         st = false_positives(fp_dets, a.videos, a.save)
         for k, s in st.items():
             mins = s["frames"] / 30 / 60

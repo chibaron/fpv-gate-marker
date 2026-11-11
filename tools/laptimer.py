@@ -41,7 +41,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from fgm import FgmDetector  # noqa: E402
+from fgm import FGM_TOL, FgmDetector  # noqa: E402
 
 COLORS = {"L": (255, 200, 0), "R": (255, 0, 255)}   # BGR: left cyan-ish, right magenta / 左は水色、右は紫
 
@@ -227,6 +227,7 @@ def main(argv=None):
     p.add_argument("--line-step", type=int, default=4, help="FgmDetector line_step")
     p.add_argument("--min-lines", type=int, default=3, help="FgmDetector min_lines")
     p.add_argument("--min-size-pct", type=float, default=5.0, help="FgmDetector min_size_pct")
+    p.add_argument("--tol", type=float, default=FGM_TOL, help="FgmDetector tol (tolerance in modules)")
     p.add_argument("--threads", type=int, default=1, help="cv2.setNumThreads (1 is fastest for small frames)")
     p.add_argument("--log", help="write passes and laps to this CSV file")
     p.add_argument("--headless", action="store_true", help="no window; print laps only")
@@ -265,7 +266,7 @@ def main(argv=None):
     if not cap.isOpened():
         raise SystemExit(f"Cannot open {a.camera}")
     video_fps = cap.get(cv2.CAP_PROP_FPS) or 30
-    det = FgmDetector(a.line_step, a.min_lines, a.min_size_pct)
+    det = FgmDetector(a.line_step, a.min_lines, a.min_size_pct, a.tol)
     timer = LapTimer(a.flicker_ms, a.min_lap)
     log = None
     if a.log:

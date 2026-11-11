@@ -20,7 +20,7 @@ except ImportError as e:
 # 黒白の幅を左から並べたもの（マス）。黒から始まる。外側に白1以上の余白
 FGM_LEFT = (3, 1, 1, 1, 1)    # left post, thick black on the outside (left) / ゲート左の柱。太い黒が外側（左）
 FGM_RIGHT = (1, 1, 1, 1, 3)   # right post, thick black on the outside (right) / ゲート右の柱。太い黒が外側（右）
-FGM_TOL = 0.5                 # tolerance in modules / 1マスに対する許容誤差
+FGM_TOL = 0.25                # default tolerance in modules (FgmDetector tol) / 1マスに対する許容誤差の既定値（FgmDetector の tol）
 FGM_MAX_GAP = 1               # unreadable scan lines allowed in a vertical chain / 縦に続いているとみなすとき、読めなくてもよい走査線の数
 # Vertical extent must be at least this times the width (rejects short matches such as OSD characters or one ArUco module)
 # 縦に続いた長さが幅のこの倍以上（OSD の文字や ArUco の1マス分だけの一致を除く）
@@ -62,15 +62,15 @@ def _binarize_rows(frame: np.ndarray, line_step: int) -> np.ndarray:
     return rows < cv2.subtract(mean, 5)           # 0 when mean < 5 (never black) / mean < 5 のときは 0（黒にならない）
 
 
-def _find_patterns(black: np.ndarray, min_width: float, patterns) -> list:
+def _find_patterns(black: np.ndarray, min_width: float, patterns, tol: float = FGM_TOL) -> list:
     """For each pattern, return the runs where black/white starting with black match its ratios,
     as [(scan line index, left x, right x), ...]. There must be white (quiet zone) outside.
     Color edges are found once; cheap conditions filter candidates before the ratios are checked.
-    Ratios are compared with integers.
+    Ratios are compared with integers. tol is the tolerance in modules.
 
     黒から始まる黒白の並びが patterns のそれぞれの比に合う区間を、並びごとに
     [(走査線番号, 左端x, 右端x), ...] で返す。外側には白（余白）があること。
-    色の境目は1回だけ求め、軽い条件で候補を絞ってから比を調べる。比は整数で比べる。"""
+    色の境目は1回だけ求め、軽い条件で候補を絞ってから比を調べる。比は整数で比べる。tol は1マスに対する許容誤差。"""
     n = len(patterns[0])
     w = black.shape[1]
     flat = black.ravel()
@@ -93,15 +93,15 @@ def _find_patterns(black: np.ndarray, min_width: float, patterns) -> list:
     out = []
     for pattern in patterns:
         # One module u = d / s. e0 -> e(n-1) is "start of black -> start of black", so it is robust to bleeding.
-        # "x is within FGM_TOL*u of a*u" is multiplied by s on both sides: |s*x - a*d| <= FGM_TOL*d (no division error).
+        # "x is within tol*u of a*u" is multiplied by s on both sides: |s*x - a*d| <= tol*d (no division error).
         # 1マス u = d / s。e0→e(n-1) は「黒の始まり→黒の始まり」なのでにじみに強い。
-        # 「x と a·u の差が FGM_TOL·u 以内」を両辺 s 倍して |s·x − a·d| ≤ FGM_TOL·d で比べる（割り算の誤差を出さない）
+        # 「x と a·u の差が tol·u 以内」を両辺 s 倍して |s·x − a·d| ≤ tol·d で比べる（割り算の誤差を出さない）
         s = sum(pattern[:n - 1])
         d = e[n - 1] - e[0]
-        tol = FGM_TOL * d
-        ok = (s * prev >= tol) & (s * nxt >= tol)
+        td = tol * d
+        ok = (s * prev >= td) & (s * nxt >= td)
         for j, a in enumerate(_similar_edges(pattern)):
-            ok &= np.abs(s * (e[j + 2] - e[j]) - a * d) <= tol
+            ok &= np.abs(s * (e[j + 2] - e[j]) - a * d) <= td
         sel = i[ok]
         out.append(list(zip(rr[sel].tolist(), cc[sel].tolist(), cc[sel + n].tolist())))
     return out
@@ -117,6 +117,8 @@ class FgmDetector:
     approach is not a pass). Create one per video stream (camera); it keeps state from the previous frame.
     A round gate ring (fgm.markers.gate_ring_pages) is read too, because a horizontal line through its center
     crosses the same patterns on the left and right.
+    `tol` is how far (in modules) the stripe spacing may differ from the ratios. Smaller rejects more false
+    matches such as OSD characters, but small (distant) markers become harder to read.
 
     左右2枚の FpvGateMarker（FGM）を、間引いた走査線で探す。
 
@@ -126,12 +128,17 @@ class FgmDetector:
     左右の両方とも見えなくなるまで「見えた」のまま（近づいて片方が画面から出ても通過にしない）。
     映像（カメラ）ごとに1つ作る（前のフレームの状態を持つ）。
     円形ゲートの輪（fgm.markers.gate_ring_pages）も、中心を通る横線の左右がこの並びになるので読める。
+    `tol` は縞の間隔が比からどれだけずれてよいか（マス）。小さいほど OSD の文字などの誤検出が減るが、
+    小さく（遠くに）写ったマーカーは読みにくくなる。
     """
 
-    def __init__(self, line_step: int = 4, min_lines: int = 3, min_size_pct: float = 5.0):
+    def __init__(self, line_step: int = 4, min_lines: int = 3, min_size_pct: float = 5.0, tol: float = FGM_TOL):
         self.line_step = max(1, int(line_step))
         self.min_lines = max(1, int(min_lines))
         self.min_size_pct = float(min_size_pct)
+        self.tol = float(tol)
+        if not self.tol >= 0:
+            raise ValueError(f"tol must be 0 or more: {tol}")
         self.seen = False    # True from when both sides are seen until both are gone / 左右両方が見えてから、両方とも見えなくなるまで True
 
     def reset(self) -> None:
@@ -141,7 +148,7 @@ class FgmDetector:
         h = frame.shape[0]
         ys = np.arange(self.line_step // 2, h, self.line_step)
         black = _binarize_rows(frame, self.line_step)
-        left, right = _find_patterns(black, h * self.min_size_pct / 100.0, (FGM_LEFT, FGM_RIGHT))
+        left, right = _find_patterns(black, h * self.min_size_pct / 100.0, (FGM_LEFT, FGM_RIGHT), self.tol)
         found = {"L": self._chains(left, ys), "R": self._chains(right, ys)}
         corners, ids = [], []
         for name, chains in found.items():

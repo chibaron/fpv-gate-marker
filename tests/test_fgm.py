@@ -81,6 +81,37 @@ def test_detector():
     assert FgmDetector().detect(cv2.cvtColor(frame_with_fgm(), cv2.COLOR_BGR2GRAY)).visible   # grayscale input too / グレーでも
 
 
+def test_tol():
+    """tol is the tolerance in modules, boundary included. A scan line of the left marker at 12 px per module,
+    with the start of the second black moved right by `shift` px (e2 - e0 and e4 - e2 are off by `shift`).
+
+    tol は1マスに対する許容誤差（境目ちょうども含む）。1マス 12px の左マーカーの横線で、
+    2本目の黒の始まりを右へ `shift` px ずらす（e2 − e0 と e4 − e2 が `shift` ずれる）。"""
+    from fgm.detector import _find_patterns
+
+    def line(shift):
+        row = np.zeros((1, 200), bool)
+        x = 20
+        for k, m in enumerate(FGM_LEFT):
+            wpx = m * 12 + (shift if k == 1 else -shift if k == 2 else 0)
+            row[0, x:x + wpx] = k % 2 == 0
+            x += wpx
+        return row
+
+    def found(shift, tol):
+        return bool(_find_patterns(line(shift), 0, (FGM_LEFT,), tol)[0])
+
+    assert found(0, 0.0)
+    assert found(3, 0.25) and not found(4, 0.25)      # 3 px = 0.25 module exactly / 3px がちょうど 0.25 マス
+    assert found(4, 0.5) and found(6, 0.5) and not found(7, 0.5)
+    assert FgmDetector().tol == 0.25 and FgmDetector(tol=0.5).tol == 0.5
+    try:
+        FgmDetector(tol=-1)
+        assert False
+    except ValueError:
+        pass
+
+
 def test_hysteresis():
     """Once visible, stays visible until both sides are gone (when one side leaves the frame as you approach).
 
