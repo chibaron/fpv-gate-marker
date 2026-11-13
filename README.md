@@ -23,6 +23,8 @@ The full specification (marker dimensions, detection steps, performance) is in [
 | Right post | white ≥1 : black 1 : white 1 : black 1 : white 1 : black 3 : white ≥1 |
 | Round gate ring (outside → inside) | white 1 : black 3 : white 1 : black 1 : white 1 : black 1 : white 1 |
 
+![Stripe widths in modules (1+ = 1 or more)](docs/fgm_widths.png)
+
 Mount the stripes vertically, with the thick black band on the outer side of the gate.
 Taller markers are easier to read and still work when the drone is tilted.
 
